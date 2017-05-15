@@ -4,9 +4,10 @@ var xml2js = require('xml2js');
 var Show  = require('./models/show');
 var async = require('async');
 var request = require('request');
-// var agenda = require('agenda')({ db: { address: 'localhost:27017/test' } });
-// var sugar = require('sugar');
-// var nodemailer = require('nodemailer');
+var agenda = require('agenda')({ db: { address: 'localhost:27017/movietracker' } });
+var sugar = require('sugar');
+var nodemailer = require('nodemailer');
+
 module.exports = function(app, passport,fs) {
 
       app.get('/', function(req, res) {
@@ -135,14 +136,12 @@ module.exports = function(app, passport,fs) {
                     return next(err);
                 }
                 // var alertDate = Date.create('Next ' + show.airsDayOfWeek + ' at ' + show.airsTime).rewind({ hour: 2});
-                // var alertDate = new Date();
-                // alertDate.setDate( alertDate.getMinutes() + 5);
-                // agenda.schedule(alertDate, 'send email alert', show.name).repeatEvery('1 week');
+                agenda.schedule("in 1 minute", 'send email alert', show.name).repeatEvery('1 week');
                 res.header('Access-Control-Allow-Origin', "*");
                 res.send(200);
             });
         });
-    });
+    })
 
     app.use(function(err, req, res, next) {
       console.error(err.stack);
@@ -169,48 +168,73 @@ module.exports = function(app, passport,fs) {
 
 };
 
-// agenda.define('send email alert', function(job, done) {
-//   Show.findOne({ name: job.attrs.data }).populate('subscribers').exec(function(err, show) {
+agenda.define('send email alert', function(job, done) {
+  Show.findOne({ name: job.attrs.data }).populate('subscribers').exec(function(err, show) {
+    if(err)
+    {
+      console.log(err);
+    }
+
+    var emails = [];
+    for (subscriber of show.subscribers) {
+      emails.push(subscriber.local.email);
+    }
 //     var emails = show.subscribers.map(function(user) {
-//       return user.email;
+//       console.log(user);
+//       console.log("Email" + user.local.email);
+//       if (user.facebook) {
+//         return user.facebook.email;
+//       } else if (user.google) {
+//         return user.google.email;
+//       } else {
+//         console.log(user.local.email);
+//         return user.local.email;
+//       }
 //     });
-//
-//     var upcomingEpisode = show.episodes.filter(function(episode) {
-//       return new Date(episode.firstAired) > new Date();
-//     })[0];
-//
-//     var smtpTransport = nodemailer.createTransport('SMTP', {
-//       service: 'SendGrid',
-//       auth: { user: 'hslogin', pass: 'hspassword00' }
-//     });
-//
-//     var mailOptions = {
-//       from: 'Fred Foo <foo@blurdybloop.com>',
-//       to: emails.join(','),
-//       subject: show.name + ' is starting soon!',
-//       text: show.name + ' starts in less than 2 hours on ' + show.network + '.\n\n' +
-//         'Episode ' + upcomingEpisode.episodeNumber + ' Overview\n\n' + upcomingEpisode.overview
-//     };
-//
-//     smtpTransport.sendMail(mailOptions, function(error, response) {
-//       console.log('Message sent: ' + response.message);
-//       smtpTransport.close();
-//       done();
-//     });
-//   });
-// });
-//
-// agenda.on('ready', function() {
-//   agenda.start();
-// });
-// // agenda.start();
-//
-// agenda.on('start', function(job) {
-//   console.log("Job %s starting", job.attrs.name);
-// });
-//
-// agenda.on('complete', function(job) {
-//   console.log("Job %s finished", job.attrs.name);
-// });
-//
-// // route middleware to make sure a user is logged in
+// console.log(emails);
+    // var upcomingEpisode = show.episodes.filter(function(episode) {
+    //   return new Date(episode.firstAired) > new Date();
+    // })[0];
+
+    var transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: 'cmpe280.group7@gmail.com',
+          pass:  'group7project'
+        }});
+
+    var mailOptions = {
+
+      from: 'Movie Tracker ✔ <Admin@movietracker.com>',
+      to: emails.join(','),
+      subject: show.name + ' is starting soon!',
+      text: show.name + ' starts in less than 2 hours on ' + show.network + '.\n\n' // +
+      // 'Episode ' + upcomingEpisode.episodeNumber + ' Overview\n\n' + upcomingEpisode.overview
+    };
+
+    transporter.sendMail(mailOptions, function(error, response) {
+      if (error) {
+        console.log('Error occurred');
+        console.log(error.message);
+        return;
+      }
+      console.log('Message sent successfully!');
+      transporter.close();
+      done();
+    });
+  });
+});
+
+agenda.on('ready', function() {
+  agenda.start();
+});
+
+agenda.on('start', function(job) {
+  console.log("Job %s starting", job.attrs.name);
+});
+
+agenda.on('complete', function(job) {
+  console.log("Job %s finished", job.attrs.name);
+});
+
+// route middleware to make sure a user is logged in
